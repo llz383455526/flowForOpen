@@ -10,7 +10,7 @@ class MergeController extends Controller {
     const query = ctx.query;
     console.log(query);
     await ctx.service.merge.initRepo();
-    ctx.service.merge.mergeFeatureIntoMaster(query.branchName);
+    await ctx.service.merge.mergeFeatureIntoMaster(query.branchName);
   }
 }
 

@@ -1,17 +1,15 @@
 'use strict';
 const path = require('path');
-const shelljs = require('shelljs');
 const fsp = require('fs-extra');
 const simpleGit = require('simple-git/promise');
 const Service = require('egg').Service;
 
-const repoName = 'githooksSample';
-const repo = 'https://github.com/llz383455526/githooksSample.git';
+const repoName = 'flowForOpen';
+const repo = 'https://github.com/llz383455526/flowForOpen.git';
 class MergeService extends Service {
   constructor(ctx) {
     super(ctx);
     console.log('constructor invoked');
-    this.initRepo();
   }
   async initRepo() {
     const workspace = this.getWorkSpace();
@@ -21,8 +19,8 @@ class MergeService extends Service {
 
     if (workspaceFiles.length) {
       try {
-        console.log('项目已存在，需要更新');
-        await git.pull();
+        console.log('项目已存在，更新所有分支');
+        await git.pull('--all');
       } catch (error) {
         console.log(`项目${repoName}更新失败：${error}`);
       }
@@ -40,8 +38,46 @@ class MergeService extends Service {
   async mergeFeatureIntoMaster(featureName) {
     const workspace = this.getWorkSpace();
     const git = simpleGit(`${workspace}`);
-    const log = await git.log();
-    console.log(log);
+
+    // 参数校验
+    const branchSummary = await git.branch();
+    console.log(branchSummary);
+    const hasFeatureBranch = branchSummary.all.some(branch => {
+      return branch === featureName;
+    });
+    if (!hasFeatureBranch) {
+      this.ctx.body = {
+        code: 400,
+        message: `参数不正确，不存在${featureName}分支`,
+        data: {
+          branchName: `${featureName}`,
+          allBranchs: branchSummary.all,
+        },
+      };
+      return;
+    }
+
+    try {
+      const options = [ '--ff' ]; // fast-forward 合并
+      options.push(featureName);
+      await git.merge(options);
+      const log = await git.log();
+      const diff = await git.diff(featureName);
+      console.log(diff);
+      this.ctx.body = {
+        code: 400,
+        message: `成功合并 ${featureName} 分支到master`,
+        data: {
+          branchName: `${featureName}`,
+          latest: log.latest,
+        },
+      };
+    } catch (error) {
+      this.ctx.body = {
+        code: 400,
+        message: `merge ${featureName} 分支失败:${error}`,
+      };
+    }
   }
 
   getWorkSpace() {
