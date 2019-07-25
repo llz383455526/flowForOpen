@@ -11,7 +11,11 @@ class MergeService extends Service {
     super(ctx);
     console.log('constructor invoked');
   }
-  async initRepo() {
+
+  /**
+   * 准备repo，保持repo 处于最新状态
+   */
+  async prepareRepo() {
     const workspace = this.getWorkSpace();
     const git = simpleGit(`${workspace}`);
 
@@ -19,8 +23,8 @@ class MergeService extends Service {
 
     if (workspaceFiles.length) {
       try {
-        console.log('项目已存在，更新所有分支');
-        await git.pull('--all');
+        console.log('项目已存在，更新master分支');
+        await git.pull();
       } catch (error) {
         console.log(`项目${repoName}更新失败：${error}`);
       }
@@ -36,14 +40,19 @@ class MergeService extends Service {
     }
   }
   async mergeFeatureIntoMaster(featureName) {
+    if (featureName) {
+      // ctx response error
+      return;
+    }
     const workspace = this.getWorkSpace();
     const git = simpleGit(`${workspace}`);
 
+
     // 参数校验
     const branchSummary = await git.branch();
-    console.log(branchSummary);
     const hasFeatureBranch = branchSummary.all.some(branch => {
-      return branch === featureName;
+      const formateResult = branch.replace('remotes/origin/', '');
+      return formateResult === featureName;
     });
     if (!hasFeatureBranch) {
       this.ctx.body = {
@@ -56,6 +65,10 @@ class MergeService extends Service {
       };
       return;
     }
+
+    // 拉取最新featureName 分支
+    const checkoutOptions = [ '-B', featureName ];
+    await git.checkout(checkoutOptions);
 
     try {
       const options = [ '--ff' ]; // fast-forward 合并
